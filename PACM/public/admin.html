@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>PACM - Administrador</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: left;
+    }
+
+    select, button {
+      padding: 5px;
+    }
+
+    #logout {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    #logout:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Panel Administrador</h2>
+  <button id="logout">Cerrar sesión</button>
+
+  <h3>Lista de usuarios</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Correo</th>
+        <th>Nombre</th>
+        <th>Apellido</th>
+        <th>Teléfono</th>
+        <th>Rol</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="usuariosTable"></tbody>
+  </table>
+
+  <script>
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert("No autorizado");
+      window.location.href = 'index.html';
+    }
+
+    // Cargar usuarios al iniciar
+    window.onload = cargarUsuarios;
+
+    async function cargarUsuarios() {
+      try {
+        const res = await fetch('/api/usuarios/admin/usuarios', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            alert("No tienes permiso o tu sesión expiró");
+            localStorage.clear();
+            window.location.href = 'index.html';
+          }
+          throw new Error("Error al obtener usuarios");
+        }
+
+        const usuarios = await res.json();
+        mostrarUsuarios(usuarios);
+
+      } catch (err) {
+        console.error(err);
+        alert("Error al cargar usuarios");
+      }
+    }
+
+    function mostrarUsuarios(usuarios) {
+      const tbody = document.getElementById('usuariosTable');
+      tbody.innerHTML = '';
+
+      usuarios.forEach(user => {
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td>${user.email}</td>
+          <td>${user.nombre}</td>
+          <td>${user.apellido}</td>
+          <td>${user.telefono || ''}</td>
+          <td>
+            <select data-user-id="${user.id_usuario}" class="rol-select">
+              <option value="1" ${user.id_rol === 1 ? 'selected' : ''}>ADMIN</option>
+              <option value="2" ${user.id_rol === 2 ? 'selected' : ''}>TECNICO</option>
+              <option value="3" ${user.id_rol === 3 ? 'selected' : ''}>CLIENTE</option>
+            </select>
+          </td>
+          <td>
+            <button class="eliminar-btn" data-user-id="${user.id_usuario}">Eliminar</button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      document.querySelectorAll('.rol-select').forEach(select => {
+        select.addEventListener('change', cambiarRol);
+      });
+
+      document.querySelectorAll('.eliminar-btn').forEach(btn => {
+        btn.addEventListener('click', eliminarUsuario);
+      });
+    }
+
+    async function cambiarRol(e) {
+      const idUsuario = e.target.getAttribute('data-user-id');
+      const nuevoRol = e.target.value;
+
+      try {
+        const res = await fetch(`/api/usuarios/admin/usuarios/${idUsuario}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ id_rol: nuevoRol })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          alert(data.mensaje || 'Rol actualizado');
+          cargarUsuarios();
+        } else {
+          alert(data.mensaje || 'Error al actualizar rol');
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error al actualizar rol");
+      }
+    }
+
+    async function eliminarUsuario(e) {
+      const idUsuario = e.target.getAttribute('data-user-id');
+
+      if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
+
+      try {
+        const res = await fetch(`/api/usuarios/admin/usuarios/${idUsuario}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          alert(data.mensaje || 'Usuario eliminado');
+          cargarUsuarios();
+        } else {
+          alert(data.mensaje || 'Error al eliminar usuario');
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error al eliminar usuario");
+      }
+    }
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.clear();
+      window.location.href = 'index.html';
+    });
+  </script>
+
+</body>
+</html>
