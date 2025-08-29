@@ -98,6 +98,7 @@ const eliminarUsuario = (req, res) => {
   });
 };
 
+
 // ------------------ LOGIN USUARIO ------------------
 const loginUsuario = async (req, res) => {
   const { email, password } = req.body;
@@ -125,13 +126,17 @@ const loginUsuario = async (req, res) => {
         return res.status(400).json({ mensaje: 'Contraseña incorrecta' });
       }
 
-      // Generar token JWT (usar secreto desde .env)
+      // Generar token JWT con nombre_rol en lugar de id_rol
       const token = jwt.sign(
-        { id: usuario.id_usuario, rol: usuario.id_rol },
-        process.env.JWT_SECRET, 
+        { 
+          id: usuario.id_usuario, 
+          rol: usuario.nombre_rol  // 👈 ahora el rol va como texto
+        },
+        process.env.JWT_SECRET || 'secreto',
         { expiresIn: '1h' }
       );
 
+      // Responder con datos de usuario + token
       res.json({
         mensaje: 'Login exitoso',
         token,
@@ -149,6 +154,7 @@ const loginUsuario = async (req, res) => {
     res.status(500).json({ mensaje: 'Error en el servidor' });
   }
 };
+
 
 // ------------------ EXPORTAR FUNCIONES ------------------
 module.exports = { 
