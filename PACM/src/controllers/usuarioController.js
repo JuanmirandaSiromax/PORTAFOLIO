@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 
 // ------------------ REGISTRAR USUARIO ------------------
 const registrarUsuario = async (req, res) => {
-  const { nombre, apellido, email, password, telefono, rol } = req.body; // rol viene como texto
+  const { nombre, apellido, email, password, telefono, rol } = req.body;
 
   if (!nombre || !apellido || !email || !password || !rol) {
     return res.status(400).json({ mensaje: 'Faltan campos requeridos' });
@@ -18,7 +18,7 @@ const registrarUsuario = async (req, res) => {
         return res.status(400).json({ mensaje: 'El correo ya está registrado' });
       }
 
-      // Buscar id_rol según el nombre del rol (en mayúsculas)
+      // Buscar id_rol según el nombre del rol (normalizado a mayúsculas)
       const rolFormateado = rol.trim().toUpperCase();
 
       db.query('SELECT id_rol FROM Roles WHERE nombre_rol = ?', [rolFormateado], async (err, rolResults) => {
@@ -37,8 +37,10 @@ const registrarUsuario = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Insertar usuario en la base de datos
-        const query = `INSERT INTO Usuarios (nombre, apellido, email, password, telefono, id_rol) 
-                       VALUES (?, ?, ?, ?, ?, ?)`;
+        const query = `
+          INSERT INTO Usuarios (nombre, apellido, email, password, telefono, id_rol) 
+          VALUES (?, ?, ?, ?, ?, ?)
+        `;
 
         db.query(query, [nombre, apellido, email, hashedPassword, telefono || null, id_rol], (err, result) => {
           if (err) {
@@ -54,7 +56,8 @@ const registrarUsuario = async (req, res) => {
     res.status(500).json({ mensaje: 'Error en el servidor' });
   }
 };
-// ------------------ OBTENER USUARIO ------------------
+
+// ------------------ OBTENER USUARIOS ------------------
 const obtenerUsuarios = (req, res) => {
   const query = `
     SELECT u.id_usuario, u.nombre, u.apellido, u.email, r.nombre_rol 
@@ -67,7 +70,8 @@ const obtenerUsuarios = (req, res) => {
     res.json(results);
   });
 };
-// ------------------ ACTUALIZAR USUARIO ------------------
+
+// ------------------ ACTUALIZAR ROL DE USUARIO ------------------
 const actualizarRolUsuario = (req, res) => {
   const { id_usuario } = req.params;
   const { id_rol } = req.body;
@@ -80,6 +84,7 @@ const actualizarRolUsuario = (req, res) => {
     res.json({ mensaje: 'Rol actualizado correctamente' });
   });
 };
+
 // ------------------ ELIMINAR USUARIO ------------------
 const eliminarUsuario = (req, res) => {
   const { id_usuario } = req.params;
@@ -92,12 +97,12 @@ const eliminarUsuario = (req, res) => {
     res.json({ mensaje: 'Usuario eliminado correctamente' });
   });
 };
+
 // ------------------ LOGIN USUARIO ------------------
 const loginUsuario = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Consulta para traer usuario junto con nombre del rol
     const query = `
       SELECT u.*, r.nombre_rol 
       FROM Usuarios u
@@ -120,14 +125,13 @@ const loginUsuario = async (req, res) => {
         return res.status(400).json({ mensaje: 'Contraseña incorrecta' });
       }
 
-      // Generar token JWT
+      // Generar token JWT (usar secreto desde .env)
       const token = jwt.sign(
         { id: usuario.id_usuario, rol: usuario.id_rol },
-        process.env.JWT_SECRET || 'secreto',
+        process.env.JWT_SECRET, 
         { expiresIn: '1h' }
       );
 
-      // Responder con datos de usuario + token + nombre del rol
       res.json({
         mensaje: 'Login exitoso',
         token,
@@ -146,4 +150,11 @@ const loginUsuario = async (req, res) => {
   }
 };
 
-module.exports = { registrarUsuario, loginUsuario };
+// ------------------ EXPORTAR FUNCIONES ------------------
+module.exports = { 
+  registrarUsuario, 
+  obtenerUsuarios, 
+  actualizarRolUsuario, 
+  eliminarUsuario, 
+  loginUsuario 
+};
