@@ -4,11 +4,18 @@ const jwt = require('jsonwebtoken');
 
 // ------------------ REGISTRAR USUARIO ------------------
 const registrarUsuario = async (req, res) => {
-  const { nombre, apellido, email, password, telefono, rol } = req.body;
+  const { nombre, apellido, email, password, telefono, rol } = req.body; // rol viene como texto
 
-  if (!nombre || !apellido || !email || !password || !rol) {
+  if (!nombre || !apellido || !email || !password || !telefono || !rol) {
     return res.status(400).json({ mensaje: 'Faltan campos requeridos' });
   }
+
+  // 👇 Validar formato del teléfono (solo números y 8-15 dígitos)
+  const telefonoRegex = /^[0-9]{8,15}$/;
+  if (!telefonoRegex.test(telefono)) {
+    return res.status(400).json({ mensaje: 'Teléfono no válido (solo dígitos, entre 8 y 15 caracteres)' });
+  }
+
 
   try {
     // Verificar si ya existe el email
@@ -18,7 +25,7 @@ const registrarUsuario = async (req, res) => {
         return res.status(400).json({ mensaje: 'El correo ya está registrado' });
       }
 
-      // Buscar id_rol según el nombre del rol (normalizado a mayúsculas)
+      // Buscar id_rol según el nombre del rol (en mayúsculas)
       const rolFormateado = rol.trim().toUpperCase();
 
       db.query('SELECT id_rol FROM Roles WHERE nombre_rol = ?', [rolFormateado], async (err, rolResults) => {
@@ -37,10 +44,8 @@ const registrarUsuario = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Insertar usuario en la base de datos
-        const query = `
-          INSERT INTO Usuarios (nombre, apellido, email, password, telefono, id_rol) 
-          VALUES (?, ?, ?, ?, ?, ?)
-        `;
+        const query = `INSERT INTO Usuarios (nombre, apellido, email, password, telefono, id_rol) 
+                       VALUES (?, ?, ?, ?, ?, ?)`;
 
         db.query(query, [nombre, apellido, email, hashedPassword, telefono || null, id_rol], (err, result) => {
           if (err) {
@@ -57,7 +62,7 @@ const registrarUsuario = async (req, res) => {
   }
 };
 
-// ------------------ OBTENER USUARIOS ------------------
+// ------------------ OBTENER USUARIO ------------------
 const obtenerUsuarios = (req, res) => {
   const query = `
     SELECT u.id_usuario, u.nombre, u.apellido, u.email, r.nombre_rol 
@@ -70,8 +75,7 @@ const obtenerUsuarios = (req, res) => {
     res.json(results);
   });
 };
-
-// ------------------ ACTUALIZAR ROL DE USUARIO ------------------
+// ------------------ ACTUALIZAR USUARIO ------------------
 const actualizarRolUsuario = (req, res) => {
   const { id_usuario } = req.params;
   const { id_rol } = req.body;
@@ -84,7 +88,6 @@ const actualizarRolUsuario = (req, res) => {
     res.json({ mensaje: 'Rol actualizado correctamente' });
   });
 };
-
 // ------------------ ELIMINAR USUARIO ------------------
 const eliminarUsuario = (req, res) => {
   const { id_usuario } = req.params;
@@ -92,18 +95,17 @@ const eliminarUsuario = (req, res) => {
   const query = `DELETE FROM Usuarios WHERE id_usuario = ?`;
 
   db.query(query, [id_usuario], (err, result) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al eliminar usuario' });
+    if (err) return res.status(500).json({ mensaje: 'Error al eliminar usuario Cliente tiene Equipos Registrados' });
     if (result.affectedRows === 0) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
     res.json({ mensaje: 'Usuario eliminado correctamente' });
   });
 };
-
-
 // ------------------ LOGIN USUARIO ------------------
 const loginUsuario = async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // Consulta para traer usuario junto con nombre del rol
     const query = `
       SELECT u.*, r.nombre_rol 
       FROM Usuarios u
@@ -126,17 +128,14 @@ const loginUsuario = async (req, res) => {
         return res.status(400).json({ mensaje: 'Contraseña incorrecta' });
       }
 
-      // Generar token JWT con nombre_rol en lugar de id_rol
+      // Generar token JWT
       const token = jwt.sign(
-        { 
-          id: usuario.id_usuario, 
-          rol: usuario.nombre_rol  // 👈 ahora el rol va como texto
-        },
+        { id: usuario.id_usuario, rol: usuario.id_rol },
         process.env.JWT_SECRET || 'secreto',
         { expiresIn: '1h' }
       );
 
-      // Responder con datos de usuario + token
+      // Responder con datos de usuario + token + nombre del rol
       res.json({
         mensaje: 'Login exitoso',
         token,
@@ -155,12 +154,4 @@ const loginUsuario = async (req, res) => {
   }
 };
 
-
-// ------------------ EXPORTAR FUNCIONES ------------------
-module.exports = { 
-  registrarUsuario, 
-  obtenerUsuarios, 
-  actualizarRolUsuario, 
-  eliminarUsuario, 
-  loginUsuario 
-};
+module.exports = { registrarUsuario, loginUsuario };
