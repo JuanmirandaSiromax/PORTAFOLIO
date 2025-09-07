@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>PACM - Administrador</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h2 { margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 10px; border: 1px solid #ccc; text-align: left; }
+    select, button, input { padding: 5px; }
+    #logout { background-color: #dc3545; color: white; border: none; padding: 8px 12px; cursor: pointer; margin-bottom: 20px; }
+    #logout:hover { background-color: #c82333; }
+    input.descripcion-input { width: 100%; }
+  </style>
+</head>
+<body>
+
+<h2>Panel Administrador</h2>
+<button id="logout">Cerrar sesión</button>
+
+<h3>Lista de usuarios</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Correo</th>
+      <th>Nombre</th>
+      <th>Apellido</th>
+      <th>Teléfono</th>
+      <th>Rol</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody id="usuariosTable"></tbody>
+</table>
+
+<h3>Lista de equipos</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Nombre</th>
+      <th>Descripción</th>
+      <th>Estado</th>
+      <th>N° Serie</th>
+      <th>Ubicación</th>
+      <th>Cliente</th>
+      <th>Año Fabricación</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody id="equiposTable"></tbody>
+</table>
+
+<script>
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    alert("No autorizado");
+    window.location.href = 'index.html';
+  }
+
+  // ------------------ Usuarios ------------------
+  async function cargarUsuarios() {
+    try {
+      const res = await fetch('/api/usuarios/admin/usuarios', { headers: { 'Authorization': 'Bearer ' + token }});
+      if (!res.ok) throw new Error("Error al obtener usuarios");
+      const usuarios = await res.json();
+      mostrarUsuarios(usuarios);
+    } catch (err) {
+      console.error(err);
+      alert("Error al cargar usuarios");
+    }
+  }
+
+  function mostrarUsuarios(usuarios) {
+    const tbody = document.getElementById('usuariosTable');
+    tbody.innerHTML = '';
+    usuarios.forEach(user => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${user.email}</td>
+        <td>${user.nombre}</td>
+        <td>${user.apellido}</td>
+        <td>${user.telefono || ''}</td>
+        <td>
+          <select data-user-id="${user.id_usuario}" class="rol-select">
+            <option value="1" ${user.id_rol === 1 ? 'selected' : ''}>ADMIN</option>
+            <option value="2" ${user.id_rol === 2 ? 'selected' : ''}>TECNICO</option>
+            <option value="3" ${user.id_rol === 3 ? 'selected' : ''}>CLIENTE</option>
+          </select>
+        </td>
+        <td><button class="eliminar-btn" data-user-id="${user.id_usuario}">Eliminar</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.querySelectorAll('.rol-select').forEach(select => select.addEventListener('change', cambiarRol));
+    document.querySelectorAll('.eliminar-btn').forEach(btn => btn.addEventListener('click', eliminarUsuario));
+  }
+
+  async function cambiarRol(e) {
+    const idUsuario = e.target.getAttribute('data-user-id');
+    const nuevoRol = e.target.value;
+    try {
+      const res = await fetch(`/api/usuarios/admin/usuarios/${idUsuario}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ id_rol: nuevoRol })
+      });
+      const data = await res.json();
+      alert(data.mensaje || 'Rol actualizado');
+      cargarUsuarios();
+    } catch (err) {
+      console.error(err);
+      alert("Error al actualizar rol");
+    }
+  }
+
+  async function eliminarUsuario(e) {
+    const idUsuario = e.target.getAttribute('data-user-id');
+    if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
+    try {
+      const res = await fetch(`/api/usuarios/admin/usuarios/${idUsuario}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }});
+      const data = await res.json();
+      alert(data.mensaje || 'Usuario eliminado');
+      cargarUsuarios();
+      cargarEquiposAdmin();
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar usuario");
+    }
+  }
+
+  // ------------------ Equipos ------------------
+  async function cargarEquiposAdmin() {
+    try {
+      const res = await fetch('/api/equipos/admin', { headers: { 'Authorization': 'Bearer ' + token }});
+      if (!res.ok) throw new Error('No autorizado o error al cargar equipos');
+      const equipos = await res.json();
+      mostrarEquiposAdmin(equipos);
+    } catch (err) {
+      console.error(err);
+      alert('Error al cargar equipos');
+    }
+  }
+
+  function mostrarEquiposAdmin(equipos) {
+    const tbody = document.getElementById('equiposTable');
+    tbody.innerHTML = '';
+    equipos.forEach(eq => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${eq.nombre_equipo}</td>
+        <td><input type="text" class="descripcion-input" data-id="${eq.id_equipo}" value="${eq.descripcion || ''}"></td>
+        <td>
+          <select class="estado-select" data-id="${eq.id_equipo}">
+            <option value="pendiente" ${eq.estado_equipo === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+            <option value="validado" ${eq.estado_equipo === 'validado' ? 'selected' : ''}>Validado</option>
+            <option value="rechazado" ${eq.estado_equipo === 'rechazado' ? 'selected' : ''}>Rechazado</option>
+          </select>
+        </td>
+        <td>${eq.numero_serie}</td>
+        <td>${eq.ubicacion}</td>
+        <td>${eq.nombre_cliente}</td>
+        <td>${eq.anio_fabricacion || '—'}</td>
+        <td>
+          <button class="guardar-estado-btn" data-id="${eq.id_equipo}">Guardar</button>
+          <button class="eliminar-equipo-btn" data-id="${eq.id_equipo}">Eliminar</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.querySelectorAll('.guardar-estado-btn').forEach(btn => btn.addEventListener('click', actualizarEstadoEquipo));
+    document.querySelectorAll('.eliminar-equipo-btn').forEach(btn => btn.addEventListener('click', eliminarEquipo));
+  }
+
+  async function actualizarEstadoEquipo(e) {
+    const id = e.target.getAttribute('data-id');
+    const estado = document.querySelector(`.estado-select[data-id="${id}"]`).value;
+    try {
+      const res = await fetch(`/api/equipos/admin/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ estado_equipo: estado })
+      });
+      const data = await res.json();
+      alert(data.mensaje || 'Estado actualizado');
+      cargarEquiposAdmin();
+    } catch (err) {
+      console.error(err);
+      alert('Error al actualizar estado');
+    }
+  }
+
+  async function eliminarEquipo(e) {
+    const id = e.target.getAttribute('data-id');
+    if (!confirm('¿Deseas eliminar este equipo?')) return;
+    try {
+      const res = await fetch(`/api/equipos/admin/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json();
+      alert(data.mensaje || 'Equipo eliminado');
+      cargarEquiposAdmin();
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar equipo');
+    }
+  }
+
+  // ------------------ Logout ------------------
+  document.getElementById('logout').addEventListener('click', () => {
+    localStorage.clear();
+    window.location.href = 'home.html';
+  });
+
+  // ------------------ Cargar al iniciar ------------------
+  window.onload = () => {
+    cargarUsuarios();
+    cargarEquiposAdmin();
+  };
+</script>
+
+</body>
+</html>

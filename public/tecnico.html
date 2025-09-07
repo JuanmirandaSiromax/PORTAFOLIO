@@ -1,0 +1,24 @@
+<body>
+  <h2>Panel Técnico</h2>
+  <p>Bienvenido, <strong id="nombreUsuario"></strong>, tu rol es: <strong id="rolUsuario"></strong></p>
+
+  <button id="logout">Cerrar sesión</button>
+
+  <script>
+    const rol = localStorage.getItem('rol');
+    const nombre = localStorage.getItem('nombre');
+
+    if (rol !== 'tecnico') {
+      alert('Acceso no autorizado');
+      window.location.href = 'index.html';
+    }
+
+    document.getElementById('rolUsuario').textContent = rol || 'No definido';
+    document.getElementById('nombreUsuario').textContent = nombre || 'Usuario';
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.clear();
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>

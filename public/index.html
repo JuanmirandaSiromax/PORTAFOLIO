@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PACM - Login y Registro</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+      width: 350px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+    input {
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .toggle-link {
+      text-align: center;
+      margin-top: 10px;
+      cursor: pointer;
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Login -->
+  <div id="loginContainer">
+    <h2>Iniciar Sesión</h2>
+    <form id="loginForm">
+      <input type="email" id="loginEmail" placeholder="Correo electrónico" required>
+      <input type="password" id="loginPassword" placeholder="Contraseña" required>
+      <button type="submit">Iniciar sesión</button>
+    </form>
+    <div class="toggle-link" onclick="toggleForms()">¿No tienes cuenta? Regístrate</div>
+  </div>
+
+  <!-- Registro -->
+  <div id="registerContainer" style="display: none;">
+    <h2>Registro</h2>
+    <form id="registerForm">
+      <input type="text" id="regNombre" placeholder="Nombre" required>
+      <input type="text" id="regApellido" placeholder="Apellido" required>
+      <input type="email" id="regEmail" placeholder="Correo electrónico" required>
+      <input type="password" id="regPassword" placeholder="Contraseña" required>
+      <input type="password" id="regPasswordConfirm" placeholder="Confirmar contraseña" required>
+      <input type="tel" id="regTelefono" placeholder="Teléfono" required pattern="[0-9]{8,15}" title="Debe contener solo números (8-15 dígitos)">
+      <button type="submit">Registrarse</button>
+    </form>
+    <div class="toggle-link" onclick="toggleForms()">¿Ya tienes cuenta? Inicia sesión</div>
+  </div>
+</div>
+
+<script>
+  function toggleForms() {
+  const loginContainer = document.getElementById('loginContainer');
+  const registerContainer = document.getElementById('registerContainer');
+
+  // Limpiar los formularios
+  document.getElementById('loginForm').reset();
+  document.getElementById('registerForm').reset();
+
+  // Alternar visibilidad
+  loginContainer.style.display = loginContainer.style.display === 'none' ? 'block' : 'none';
+  registerContainer.style.display = registerContainer.style.display === 'none' ? 'block' : 'none';
+}
+
+  // ------------------- Registro -------------------
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const nombre = document.getElementById('regNombre').value;
+  const apellido = document.getElementById('regApellido').value;
+  const email = document.getElementById('regEmail').value;
+  const password = document.getElementById('regPassword').value;
+  const confirmar = document.getElementById('regPasswordConfirm').value;
+  const telefono = document.getElementById('regTelefono').value;
+
+  if (password !== confirmar) {
+    alert("Las contraseñas no coinciden");
+    return;
+  }
+
+  try {
+      const res = await fetch("/api/usuarios/registro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, apellido, email, password, telefono, rol: "CLIENTE" })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(data.mensaje || "Usuario registrado con éxito.");
+
+        // Guardar datos mínimos en localStorage (opcional)
+        localStorage.setItem('nombre', nombre);
+        localStorage.setItem('rol', 'cliente');
+
+        // Redirigir al cliente
+        window.location.href = "cliente.html";
+      } else {
+        alert(data.mensaje || "Error al registrar usuario.");
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Error al registrar usuario.");
+    }
+  });
+
+
+// ------------------- Login -------------------
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+
+  try {
+    const res = await fetch("/api/usuarios/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }) // corregido
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      // Guardar datos en localStorage para sesiones
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('usuario', data.usuario.id);
+      localStorage.setItem('nombre', data.usuario.nombre);
+      localStorage.setItem('rol', data.usuario.rol.toLowerCase()); // para comparar
+
+      // Redireccionar según rol
+      if (data.usuario.rol.toLowerCase() === 'admin') window.location.href = 'admin.html';
+      else if (data.usuario.rol.toLowerCase() === 'tecnico') window.location.href = 'tecnico.html';
+      else window.location.href = 'cliente.html';
+
+    } else {
+      alert(data.mensaje || "Credenciales incorrectas");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error al iniciar sesión.");
+  }
+});
+</script>
+
+</body>
+</html>

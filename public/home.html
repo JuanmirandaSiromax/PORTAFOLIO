@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>PACM - Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header { background-color: #003366; color: white; padding: 1em; text-align: center; }
+    nav { background-color: #0055aa; display: flex; justify-content: center; gap: 1em; padding: 0.5em; }
+    nav a, nav button { color: white; text-decoration: none; background: none; border: none; font-size: 1em; cursor: pointer; }
+    nav a:hover, nav button:hover { text-decoration: underline; }
+    main { padding: 2em; text-align: center; }
+    .imagenes { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 2em; }
+    .imagenes img { max-width: 300px; height: auto; border: 2px solid #ccc; border-radius: 10px; transition: transform 0.3s; }
+    .imagenes img:hover { transform: scale(1.05); }
+    .card { max-width: 720px; margin: 1.5em auto 0; text-align: left; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1em 1.2em; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .card h3 { margin: 0 0 .5em; }
+    .muted { color: #666; font-size: 0.95em; }
+    footer { background-color: #003366; color: white; padding: 1em; text-align: center; margin-top: 2em; }
+
+    /* 👇 estilos que faltaban para la API de clima */
+    .weather-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+      gap: 12px; 
+      margin-top: .5em; 
+    }
+    .weather-item { 
+      border: 1px solid #ddd; 
+      border-radius: 8px; 
+      padding: 10px; 
+      background: #fff; 
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bienvenido a PACM</h1>
+  </header>
+
+  <!-- NAV -->
+  <nav id="navbar"><!-- contenido dinámico --></nav>
+
+  <main>
+    <div id="authSection"></div>
+
+    <!-- Tarjeta de clima (API) -->
+    <div id="weatherCard" class="card" style="display:none;">
+      <h3>🌎 Clima actual</h3>
+      <p class="muted">Fuente: OpenWeather</p>
+      <div id="weather-container" class="weather-grid">
+        <p>Cargando información del clima...</p>
+      </div>
+    </div>
+
+    <div class="imagenes">
+      <img src="img/img1.jpg" alt="Técnico realizando mantenimiento" loading="lazy">
+      <img src="img/img2.jpg" alt="Agenda de mantenciones programadas" loading="lazy">
+      <img src="img/img3.jpg" alt="Panel de control del sistema PACM" loading="lazy">
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 PACM - Plataforma de Agendamiento y Control de Mantenimiento</p>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const token  = localStorage.getItem('token');
+      const rawRol = localStorage.getItem('rol') || '';
+      const rol    = rawRol.toLowerCase(); // normaliza
+      const nombre = localStorage.getItem('nombre');
+
+      const authSection = document.getElementById('authSection');
+      const navbar = document.getElementById('navbar');
+
+      // ---- Navbar + saludo según sesión ----
+      if (token) {
+        authSection.innerHTML = `
+          <p>Bienvenido, <strong>${nombre || "Usuario"}</strong></p>
+          <p>Rol: <strong>${rol || "no definido"}</strong></p>
+        `;
+
+        let navHTML = `<a href="home.html">Home</a>`;
+        if (rol === "cliente")  navHTML += `<a href="cliente.html">Perfil Cliente</a>`;
+        if (rol === "admin")    navHTML += `<a href="admin.html">Panel Admin</a>`;
+        if (rol === "tecnico")  navHTML += `<a href="tecnico.html">Panel Técnico</a>`;
+        navHTML += `<button id="logout">Cerrar Sesión</button>`;
+        navbar.innerHTML = navHTML;
+
+        document.getElementById('logout').addEventListener('click', () => {
+          localStorage.clear();
+          window.location.href = "index.html"; // vuelve al login
+        });
+      } else {
+        authSection.innerHTML = `<p>Accede a todas las funcionalidades:</p>`;
+        navbar.innerHTML = `
+          <a href="home.html">Home</a>
+          <a href="index.html">Iniciar Sesión</a>
+        `;
+      }
+
+      // ====== API OpenWeather (múltiples ciudades) ======
+      (function cargarClimaMulti() {
+        const apiKey = "9ae48e163fa92a518e3c8972ebdcd0cc"; 
+        const ciudades = ["Santiago", "Valparaíso", "Concepción"]; 
+
+        const card = document.getElementById('weatherCard');
+        const cont = document.getElementById('weather-container');
+        card.style.display = 'block';
+        cont.innerHTML = ""; // limpia placeholder
+
+        if (!apiKey || apiKey === "RR9ae48e163fa92a518e3c8972ebdcd0cc") {
+          cont.innerHTML = `<div class="weather-item"><strong>Configura tu API key</strong><br><span class="muted">Agrega tu clave de OpenWeather en el código para ver el clima.</span></div>`;
+          return;
+        }
+
+        const crearItem = (ciudad, html) => {
+          const div = document.createElement('div');
+          div.className = 'weather-item';
+          div.innerHTML = `<strong>${ciudad}</strong><br>${html}`;
+          cont.appendChild(div);
+        };
+
+        ciudades.forEach(ciudad => {
+          fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(ciudad)}&appid=${apiKey}&units=metric&lang=es`)
+            .then(r => r.json())
+            .then(d => {
+              if (!d || d.cod !== 200 || !d.main) {
+                crearItem(ciudad, `<span class="muted">No se pudo obtener el clima.</span>`);
+                return;
+              }
+              const desc = d.weather?.[0]?.description || '—';
+              const temp = typeof d.main.temp === 'number' ? d.main.temp.toFixed(0) : '—';
+              crearItem(ciudad, `${temp}°C, ${desc}`);
+            })
+            .catch(() => crearItem(ciudad, `<span class="muted">Error cargando clima.</span>`));
+        });
+      })();
+    });
+  </script>
+</body>
+</html>
+

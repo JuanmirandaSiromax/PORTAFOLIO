@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PACM - Panel Cliente</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .perfil-container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+      max-width: 600px;
+      margin: 0 auto 30px auto;
+    }
+
+    h2 { text-align: center; }
+
+    .dato {
+      margin: 10px 0;
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .acciones {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 10px 15px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .editar { background-color: #007bff; color: white; }
+    .guardar { background-color: #28a745; color: white; }
+    .cancelar { background-color: #dc3545; color: white; }
+
+    input, select {
+      padding: 8px;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #007bff;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+<!-- PERFIL CLIENTE -->
+<div class="perfil-container">
+  <h2>Perfil Cliente</h2>
+  
+  <div id="perfilVista">
+    <div class="dato"><strong>Nombre:</strong> <span id="vNombre"></span></div>
+    <div class="dato"><strong>Apellido:</strong> <span id="vApellido"></span></div>
+    <div class="dato"><strong>Email:</strong> <span id="vEmail"></span></div>
+    <div class="dato"><strong>Teléfono:</strong> <span id="vTelefono"></span></div>
+    <div class="dato"><strong>RUT Empresa:</strong> <span id="vRut"></span></div>
+    <div class="dato"><strong>Nombre Empresa:</strong> <span id="vEmpresa"></span></div>
+    <div class="dato"><strong>Dirección Empresa:</strong> <span id="vDireccion"></span></div>
+
+    <div class="acciones">
+      <button class="editar" onclick="mostrarEdicion()">Editar Perfil</button>
+      <button id="logout">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div id="perfilEdicion" style="display: none;">
+    <input type="text" id="eNombre" placeholder="Nombre">
+    <input type="text" id="eApellido" placeholder="Apellido">
+    <input type="tel" id="eTelefono" placeholder="Teléfono">
+    <input type="text" id="eRut" placeholder="RUT Empresa">
+    <input type="text" id="eEmpresa" placeholder="Nombre Empresa">
+    <input type="text" id="eDireccion" placeholder="Dirección Empresa">
+
+    <div class="acciones">
+      <button class="guardar" onclick="guardarCambios()">Guardar</button>
+      <button class="cancelar" onclick="cancelarEdicion()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MIS EQUIPOS -->
+<div class="perfil-container">
+  <h2>Mis Equipos</h2>
+
+  <!-- Formulario para crear nuevo equipo -->
+  <div id="nuevoEquipoForm">
+    <h3>Agregar Nuevo Equipo</h3>
+    <input type="text" id="nNombreEquipo" placeholder="Nombre del equipo">
+    <input type="text" id="nDescripcionEquipo" placeholder="Descripción">
+    <input type="text" id="nNumeroSerie" placeholder="Número de serie">
+    <input type="text" id="nUbicacion" placeholder="Ubicación">
+    <input type="number" id="nAnioFabricacion" placeholder="Año de fabricación (opcional)">
+    <div class="acciones">
+      <button class="guardar" onclick="crearEquipo()">Crear Equipo</button>
+    </div>
+  </div>
+
+  <div id="equiposVista">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Descripción</th>
+          <th>Estado</th>
+          <th>N° Serie</th>
+          <th>Ubicación</th>
+          <th>Año Fabricación</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="listaEquipos">
+        <!-- Equipos se cargan aquí -->
+      </tbody>
+    </table>
+  </div>
+
+  <div id="equiposEdicion" style="display: none; margin-top: 15px;">
+    <h3>Editar Descripción</h3>
+    <input type="text" id="eDescripcionEquipo" placeholder="Descripción">
+    <div class="acciones">
+      <button class="guardar" onclick="guardarDescripcion()">Guardar</button>
+      <button class="cancelar" onclick="cancelarEdicionEquipo()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const userId = localStorage.getItem('usuario');
+  const token = localStorage.getItem('token');
+
+  let equipos = [];
+  let equipoEditandoId = null;
+
+  // ------------------ PERFIL ------------------
+  async function cargarPerfil() {
+    try {
+      const res = await fetch(`/api/usuarios/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      document.getElementById('vNombre').textContent = data.nombre || '';
+      document.getElementById('vApellido').textContent = data.apellido || '';
+      document.getElementById('vEmail').textContent = data.email || '';
+      document.getElementById('vTelefono').textContent = data.telefono || '';
+      document.getElementById('vRut').textContent = data.rut_empresa || '—';
+      document.getElementById('vEmpresa').textContent = data.nombre_empresa || '—';
+      document.getElementById('vDireccion').textContent = data.direccion_empresa || '—';
+
+      document.getElementById('eNombre').value = data.nombre || '';
+      document.getElementById('eApellido').value = data.apellido || '';
+      document.getElementById('eTelefono').value = data.telefono || '';
+      document.getElementById('eRut').value = data.rut_empresa || '';
+      document.getElementById('eEmpresa').value = data.nombre_empresa || '';
+      document.getElementById('eDireccion').value = data.direccion_empresa || '';
+    } catch (err) {
+      console.error(err);
+      alert('Error al cargar perfil');
+    }
+  }
+
+  function mostrarEdicion() {
+    document.getElementById('perfilVista').style.display = 'none';
+    document.getElementById('perfilEdicion').style.display = 'block';
+  }
+
+  function cancelarEdicion() {
+    document.getElementById('perfilVista').style.display = 'block';
+    document.getElementById('perfilEdicion').style.display = 'none';
+  }
+
+  async function guardarCambios() {
+    const nombre = document.getElementById('eNombre').value;
+    const apellido = document.getElementById('eApellido').value;
+    const telefono = document.getElementById('eTelefono').value;
+    const rut_empresa = document.getElementById('eRut').value;
+    const nombre_empresa = document.getElementById('eEmpresa').value;
+    const direccion_empresa = document.getElementById('eDireccion').value;
+
+    try {
+      const res = await fetch(`/api/usuarios/${userId}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ nombre, apellido, telefono, rut_empresa, nombre_empresa, direccion_empresa })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.mensaje || 'Perfil actualizado');
+        cancelarEdicion();
+        cargarPerfil();
+      } else {
+        alert(data.mensaje || 'Error al actualizar');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar cambios');
+    }
+  }
+
+  document.getElementById('logout').addEventListener('click', () => {
+    localStorage.clear();
+    window.location.href = 'index.html';
+  });
+
+  // ------------------ EQUIPOS ------------------
+  async function cargarEquipos() {
+    try {
+      const res = await fetch(`/api/equipos/cliente/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      equipos = await res.json();
+
+      const tbody = document.getElementById('listaEquipos');
+      tbody.innerHTML = '';
+
+      equipos.forEach(eq => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${eq.id_equipo}</td>
+          <td>${eq.nombre_equipo}</td>
+          <td>${eq.descripcion}</td>
+          <td>${eq.estado_equipo}</td>
+          <td>${eq.numero_serie}</td>
+          <td>${eq.ubicacion}</td>
+          <td>${eq.anio_fabricacion || '—'}</td>
+          <td>
+            <button class="editar" onclick="editarEquipo(${eq.id_equipo})">Editar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Error al cargar equipos');
+    }
+  }
+
+  function editarEquipo(id) {
+    equipoEditandoId = id;
+    const equipo = equipos.find(e => e.id_equipo === id);
+    document.getElementById('eDescripcionEquipo').value = equipo.descripcion || '';
+    document.getElementById('equiposVista').style.display = 'none';
+    document.getElementById('equiposEdicion').style.display = 'block';
+  }
+
+  function cancelarEdicionEquipo() {
+    equipoEditandoId = null;
+    document.getElementById('equiposVista').style.display = 'block';
+    document.getElementById('equiposEdicion').style.display = 'none';
+  }
+
+  async function guardarDescripcion() {
+    const descripcion = document.getElementById('eDescripcionEquipo').value;
+
+    try {
+      const res = await fetch(`/api/equipos/${equipoEditandoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ descripcion })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.mensaje || 'Descripción actualizada');
+        cancelarEdicionEquipo();
+        cargarEquipos();
+      } else {
+        alert(data.mensaje || 'Error al actualizar descripción');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar cambios');
+    }
+  }
+
+  async function crearEquipo() {
+    const nombre_equipo = document.getElementById('nNombreEquipo').value;
+    const descripcion = document.getElementById('nDescripcionEquipo').value;
+    const numero_serie = document.getElementById('nNumeroSerie').value;
+    const ubicacion = document.getElementById('nUbicacion').value;
+    const anio_fabricacion = document.getElementById('nAnioFabricacion').value;
+
+    if (!nombre_equipo || !numero_serie || !ubicacion) {
+      return alert('Nombre, número de serie y ubicación son obligatorios');
+    }
+
+    try {
+      const res = await fetch(`/api/equipos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ nombre_equipo, descripcion, numero_serie, ubicacion, anio_fabricacion })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.mensaje || 'Equipo creado');
+        document.getElementById('nNombreEquipo').value = '';
+        document.getElementById('nDescripcionEquipo').value = '';
+        document.getElementById('nNumeroSerie').value = '';
+        document.getElementById('nUbicacion').value = '';
+        document.getElementById('nAnioFabricacion').value = '';
+        cargarEquipos();
+      } else {
+        alert(data.mensaje || 'Error al crear equipo');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al crear equipo');
+    }
+  }
+
+  // ------------------ INIT ------------------
+  if (!token || !userId) {
+    window.location.href = 'index.html';
+  } else {
+    cargarPerfil();
+    cargarEquipos();
+  }
+</script>
+
+</body>
+</html>
